@@ -105,7 +105,7 @@ export class EmbeddingService {
     try {
       // Truncate text if it exceeds model limits
       const truncatedText = this.truncateText(text);
-      
+
       // Generate embedding
       const output = await this.pipeline(truncatedText, {
         pooling: 'mean',
@@ -114,7 +114,7 @@ export class EmbeddingService {
 
       // Extract embedding array from tensor
       const embedding = Array.from(output.data) as number[];
-      
+
       const processingTime = Date.now() - startTime;
 
       return {
@@ -125,7 +125,7 @@ export class EmbeddingService {
       };
     } catch (error) {
       console.error(`Failed to generate embedding for chunk ${chunkId}:`, error);
-      
+
       throw new Error(`Embedding generation failed: ${error}`);
     }
   }
@@ -143,7 +143,7 @@ export class EmbeddingService {
     // Process chunks in batches to manage memory usage
     for (let i = 0; i < chunks.length; i += EMBEDDING_CONFIG.batchSize) {
       const batch = chunks.slice(i, i + EMBEDDING_CONFIG.batchSize);
-      
+
       // Process batch concurrently but with controlled parallelism
       const batchPromises = batch.map(async (chunk) => {
         try {
@@ -193,7 +193,7 @@ export class EmbeddingService {
   private truncateText(text: string): string {
     // Rough estimation: ~4 characters per token
     const maxChars = EMBEDDING_CONFIG.maxTokens * 4;
-    
+
     if (text.length <= maxChars) {
       return text;
     }
@@ -201,7 +201,7 @@ export class EmbeddingService {
     // Truncate at word boundary
     const truncated = text.slice(0, maxChars);
     const lastSpaceIndex = truncated.lastIndexOf(' ');
-    
+
     return lastSpaceIndex > 0 ? truncated.slice(0, lastSpaceIndex) : truncated;
   }
 

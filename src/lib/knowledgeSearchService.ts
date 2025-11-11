@@ -64,18 +64,18 @@ export class KnowledgeSearchService {
   private async _initializeServices(onProgress?: ProgressCallback): Promise<void> {
     try {
       onProgress?.('Initializing AI models...', 10);
-      
+
       // Initialize embedding service (loads AI model)
       await embeddingService.initialize();
       onProgress?.('AI models loaded', 50);
-      
+
       // Initialize vector storage
       await vectorStorageService.initialize();
       onProgress?.('Vector database ready', 80);
-      
+
       this.isInitialized = true;
       onProgress?.('System ready', 100);
-      
+
       console.log('Knowledge search service initialized successfully');
     } catch (error) {
       this.initializationPromise = null;
@@ -91,15 +91,15 @@ export class KnowledgeSearchService {
     onProgress?: ProgressCallback
   ): Promise<CompleteProcessingResult> {
     await this.initialize();
-    
+
     const startTime = Date.now();
-    
+
     try {
       onProgress?.('Processing document...', 0, 'Extracting text');
-      
+
       // Step 1: Extract text and create chunks
       const extractionResult: ProcessingResult = await extractTextFromFile(file);
-      
+
       if (!extractionResult.success) {
         return {
           metadata: extractionResult.metadata,
@@ -110,38 +110,38 @@ export class KnowledgeSearchService {
           processingTimeMs: Date.now() - startTime,
         };
       }
-      
+
       onProgress?.('Text extracted successfully', 20, `${extractionResult.chunks.length} chunks created`);
-      
+
       // Step 2: Generate embeddings for all chunks
       onProgress?.('Generating embeddings...', 30, 'Processing with AI model');
-      
+
       const embeddingResult: BatchEmbeddingResult = await embeddingService.generateBatchEmbeddings(
         extractionResult.chunks
       );
-      
+
       if (embeddingResult.errors.length > 0) {
         console.warn(`Embedding generation had ${embeddingResult.errors.length} errors:`, embeddingResult.errors);
       }
-      
+
       const successRate = (embeddingResult.successCount / extractionResult.chunks.length) * 100;
       onProgress?.('Embeddings generated', 70, `${embeddingResult.successCount}/${extractionResult.chunks.length} chunks (${successRate.toFixed(0)}%)`);
-      
+
       // Step 3: Store embeddings in vector database
       if (embeddingResult.results.length > 0) {
         onProgress?.('Storing in vector database...', 80, 'Indexing for search');
-        
+
         await vectorStorageService.storeEmbeddings(
           extractionResult.chunks,
           embeddingResult.results,
           extractionResult.metadata
         );
-        
+
         onProgress?.('Storage complete', 100, 'Document ready for search');
       }
-      
+
       const totalTime = Date.now() - startTime;
-      
+
       return {
         metadata: extractionResult.metadata,
         chunks: extractionResult.chunks,
@@ -149,10 +149,10 @@ export class KnowledgeSearchService {
         success: true,
         processingTimeMs: totalTime,
       };
-      
+
     } catch (error) {
       console.error('Document processing failed:', error);
-      
+
       // Create minimal metadata for error case
       const errorMetadata: DocumentMetadata = {
         id: `error_${Date.now()}`,
@@ -164,7 +164,7 @@ export class KnowledgeSearchService {
         chunkCount: 0,
         errorMessage: error instanceof Error ? error.message : String(error),
       };
-      
+
       return {
         metadata: errorMetadata,
         chunks: [],
@@ -184,18 +184,18 @@ export class KnowledgeSearchService {
     options?: SearchOptions
   ): Promise<EnhancedSearchResult[]> {
     await this.initialize();
-    
+
     if (!query.trim()) {
       return [];
     }
-    
+
     try {
       // Generate embedding for search query
       const queryEmbedding = await embeddingService.generateEmbedding(
         query.trim(),
         `query_${Date.now()}`
       );
-      
+
       // Search vector database
       const searchResults = await vectorStorageService.search(
         queryEmbedding.embedding,
@@ -206,16 +206,16 @@ export class KnowledgeSearchService {
           includeMetadata: options?.includeMetadata !== false,
         }
       );
-      
+
       // Enhance results with snippets and relevance reasoning
       const enhancedResults: EnhancedSearchResult[] = searchResults.map(result => ({
         ...result,
         snippet: this.generateSnippet(result.text, query),
         relevanceReason: this.generateRelevanceReason(result.score),
       }));
-      
+
       return enhancedResults;
-      
+
     } catch (error) {
       console.error('Search failed:', error);
       throw new Error(`Search failed: ${error}`);
@@ -250,7 +250,7 @@ export class KnowledgeSearchService {
   async getStats() {
     await this.initialize();
     const storageStats = await vectorStorageService.getStats();
-    
+
     return {
       ...storageStats,
       embeddingModel: embeddingService.getModelInfo(),
@@ -283,35 +283,35 @@ export class KnowledgeSearchService {
   private generateSnippet(text: string, query: string, maxLength: number = 150): string {
     const words = text.split(/\s+/);
     const queryWords = query.toLowerCase().split(/\s+/);
-    
+
     // Find the best starting position (where most query words appear)
     let bestStart = 0;
     let bestScore = 0;
-    
+
     for (let i = 0; i < Math.max(0, words.length - 20); i++) {
       const window = words.slice(i, i + 20).join(' ').toLowerCase();
-      const score = queryWords.reduce((acc, qWord) => 
+      const score = queryWords.reduce((acc, qWord) =>
         acc + (window.includes(qWord) ? 1 : 0), 0
       );
-      
+
       if (score > bestScore) {
         bestScore = score;
         bestStart = i;
       }
     }
-    
+
     // Create snippet around best position
     const snippetWords = words.slice(bestStart, bestStart + 25);
     let snippet = snippetWords.join(' ');
-    
+
     if (snippet.length > maxLength) {
       snippet = snippet.slice(0, maxLength) + '...';
     }
-    
+
     if (bestStart > 0) {
       snippet = '...' + snippet;
     }
-    
+
     return snippet;
   }
 
@@ -337,7 +337,7 @@ export class KnowledgeSearchService {
    */
   private getFileTypeFromFile(file: File): 'pdf' | 'docx' | 'txt' | 'md' {
     const extension = file.name.split('.').pop()?.toLowerCase();
-    
+
     switch (extension) {
       case 'pdf':
         return 'pdf';

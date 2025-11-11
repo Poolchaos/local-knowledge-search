@@ -41,10 +41,10 @@ class EmbeddingWorker {
   async initialize(): Promise<void> {
     try {
       console.log('[Worker] Initializing embedding service...');
-      
+
       await embeddingService.initialize();
       this.isInitialized = true;
-      
+
       console.log('[Worker] Embedding service initialized successfully');
     } catch (error) {
       console.error('[Worker] Failed to initialize embedding service:', error);
@@ -70,12 +70,12 @@ class EmbeddingWorker {
           if (!this.isInitialized) {
             throw new Error('Embedding service not initialized');
           }
-          
+
           const singleResult = await embeddingService.generateEmbedding(
             message.payload.text,
             message.payload.chunkId
           );
-          
+
           return {
             type: 'SINGLE_RESULT',
             payload: singleResult
@@ -86,16 +86,16 @@ class EmbeddingWorker {
           if (!this.isInitialized) {
             throw new Error('Embedding service not initialized');
           }
-          
+
           // Send progress updates during batch processing
           const chunks = message.payload.chunks;
           const batchSize = 5; // Match embedding service batch size
-          
+
           let processedCount = 0;
-          
+
           for (let i = 0; i < chunks.length; i += batchSize) {
             const progress = Math.round((processedCount / chunks.length) * 100);
-            
+
             postMessage({
               type: 'PROGRESS',
               payload: {
@@ -104,12 +104,12 @@ class EmbeddingWorker {
                 details: `Processing ${Math.min(i + batchSize, chunks.length)}/${chunks.length} chunks`
               }
             });
-            
+
             processedCount = Math.min(i + batchSize, chunks.length);
           }
-          
+
           const batchResult = await embeddingService.generateBatchEmbeddings(chunks);
-          
+
           return {
             type: 'BATCH_RESULT',
             payload: batchResult
@@ -133,26 +133,26 @@ class EmbeddingWorker {
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
-      
+
       switch (message.type) {
         case 'INITIALIZE':
           return {
             type: 'INITIALIZATION_ERROR',
             payload: { error: errorMessage }
           };
-        
+
         case 'GENERATE_SINGLE':
           return {
             type: 'SINGLE_ERROR',
             payload: { error: errorMessage }
           };
-        
+
         case 'GENERATE_BATCH':
           return {
             type: 'BATCH_ERROR',
             payload: { error: errorMessage }
           };
-        
+
         default:
           throw error;
       }

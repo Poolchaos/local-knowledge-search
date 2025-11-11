@@ -120,13 +120,13 @@ export class VectorStorageService {
 
     try {
       console.log('Initializing vector storage with LanceDB...');
-      
+
       // Connect to LanceDB (will use IndexedDB in browser)
       this.db = await connect(this.dbPath);
-      
+
       // Check if table exists, create if not
       const tableNames = await this.db.tableNames();
-      
+
       if (tableNames.includes(this.tableName)) {
         this.table = await this.db.openTable(this.tableName);
         console.log('Opened existing vector table');
@@ -135,7 +135,7 @@ export class VectorStorageService {
         const sampleRecord: VectorRecord = {
           id: 'sample',
           documentId: 'sample',
-          chunkId: 'sample', 
+          chunkId: 'sample',
           chunkIndex: 0,
           text: 'sample text',
           vector: new Array(384).fill(0),
@@ -148,15 +148,15 @@ export class VectorStorageService {
             createdAt: new Date().toISOString(),
           },
         };
-        
+
         this.table = await this.db.createTable(this.tableName, [sampleRecord]);
-        
+
         // Remove sample record
         await this.table.delete("id = 'sample'");
-        
+
         console.log('Created new vector table');
       }
-      
+
       this.isInitialized = true;
       console.log('Vector storage initialized successfully');
     } catch (error) {
@@ -190,7 +190,7 @@ export class VectorStorageService {
         .filter(chunk => embeddingMap.has(chunk.id))
         .map(chunk => {
           const embedding = embeddingMap.get(chunk.id)!;
-          
+
           return {
             id: generateId(),
             documentId: chunk.documentId,
@@ -215,7 +215,7 @@ export class VectorStorageService {
 
       // Insert records into table
       await this.table.add(vectorRecords);
-      
+
       console.log(`Stored ${vectorRecords.length} vector records for document ${documentMetadata.filename}`);
     } catch (error) {
       console.error('Failed to store embeddings:', error);
@@ -309,14 +309,14 @@ export class VectorStorageService {
     try {
       // Count total records
       const totalRecords = await this.table.countRows();
-      
+
       // Get unique documents
       const documentsQuery = await this.table
         .search([])
         .select(['documentId', 'metadata'])
         .limit(10000)
         .toArray();
-      
+
       // Get unique documents
       const uniqueDocuments = new Set(
         documentsQuery.map((record: LanceSearchResult) => record.documentId)
@@ -374,7 +374,7 @@ export class VectorStorageService {
       for (const record of records) {
         const docId = record.documentId;
         const metadata = record.metadata;
-        
+
         if (!documentMap.has(docId)) {
           documentMap.set(docId, {
             documentId: docId,

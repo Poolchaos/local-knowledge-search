@@ -1,8 +1,8 @@
 import type { DocumentChunk } from '../lib/types';
 import type { EmbeddingResult, BatchEmbeddingResult } from '../lib/embeddingService';
-import type { 
-  EmbeddingWorkerMessage, 
-  EmbeddingWorkerResponse 
+import type {
+  EmbeddingWorkerMessage,
+  EmbeddingWorkerResponse
 } from '../workers/embeddingWorker';
 
 /**
@@ -17,23 +17,7 @@ interface PendingRequest {
   resolve: (value: EmbeddingWorkerResponse) => void;
   reject: (error: Error) => void;
   timeout?: NodeJS.Timeout;
-}
-
-/**
- * Worker message with ID for tracking
- */
-interface WorkerMessageWithId extends EmbeddingWorkerMessage {
-  id: number;
-}
-
-/**
- * Worker response with ID for tracking
- */
-interface WorkerResponseWithId extends EmbeddingWorkerResponse {
-  id?: number;
-}
-
-/**
+}/**
  * Worker manager that handles communication with the embedding Web Worker
  */
 export class EmbeddingWorkerManager {
@@ -41,6 +25,7 @@ export class EmbeddingWorkerManager {
   private isInitialized = false;
   private messageId = 0;
   private pendingRequests = new Map<number, PendingRequest>();
+  private currentProgressCallback?: WorkerProgressCallback;
 
   /**
    * Initialize the Web Worker
@@ -70,7 +55,7 @@ export class EmbeddingWorkerManager {
       // Initialize the worker
       onProgress?.('Starting AI model...', 0);
       const initResponse = await this.sendMessage({ type: 'INITIALIZE' });
-      
+
       if (initResponse.type === 'INITIALIZED') {
         this.isInitialized = true;
         onProgress?.('AI model ready', 100, 'Embedding service initialized');
@@ -117,10 +102,16 @@ export class EmbeddingWorkerManager {
       throw new Error('Embedding worker not initialized');
     }
 
+    // Store progress callback for worker messages
+    this.currentProgressCallback = onProgress;
+
     const response = await this.sendMessage({
       type: 'GENERATE_BATCH',
       payload: { chunks }
-    }, onProgress);
+    });
+
+    // Clear progress callback
+    this.currentProgressCallback = undefined;
 
     if (response.type === 'BATCH_RESULT') {
       return response.payload;
@@ -166,8 +157,7 @@ export class EmbeddingWorkerManager {
    * Send message to worker and return response
    */
   private sendMessage(
-    message: EmbeddingWorkerMessage,
-    _onProgress?: WorkerProgressCallback
+    message: EmbeddingWorkerMessage
   ): Promise<EmbeddingWorkerResponse> {
     return new Promise((resolve, reject) => {
       if (!this.worker) {
@@ -200,12 +190,13 @@ export class EmbeddingWorkerManager {
    * Handle messages from worker
    */
   private handleWorkerMessage(
-    response: WorkerResponseWithId,
-    onProgress?: WorkerProgressCallback
+    response: EmbeddingWorkerResponse & { id?: number },
+    initProgressCallback?: WorkerProgressCallback
   ): void {
     // Handle progress messages separately
     if (response.type === 'PROGRESS') {
-      onProgress?.(
+      const progressCallback = this.currentProgressCallback || initProgressCallback;
+      progressCallback?.(
         response.payload.stage,
         response.payload.progress,
         response.payload.details
@@ -214,13 +205,14 @@ export class EmbeddingWorkerManager {
     }
 
     // Handle status messages without ID
-    if (response.type === 'STATUS' && !response.id) {
+    if (response.type === 'STATUS' && !('id' in response)) {
       // Initial status message, ignore
       return;
     }
 
     // Find matching request
-    const messageId = response.id;
+    const responseWithId = response as EmbeddingWorkerResponse & { id?: number };
+    const messageId = responseWithId.id;
     if (!messageId) {
       console.warn('Received worker response without message ID:', response);
       return;
@@ -240,8 +232,8 @@ export class EmbeddingWorkerManager {
 
     // Resolve or reject
     if (response.type.includes('ERROR')) {
-      const errorPayload = (response as { payload: { error: string } }).payload;
-      pendingRequest.reject(new Error(errorPayload.error));
+      const errorResponse = response as { payload: { error: string } };
+      pendingRequest.reject(new Error(errorResponse.payload.error));
     } else {
       pendingRequest.resolve(response);
     }
@@ -268,7 +260,7 @@ export class EmbeddingWorkerManager {
       this.worker.terminate();
       this.worker = null;
     }
-    
+
     this.isInitialized = false;
     this.rejectAllPending(new Error('Worker terminated'));
   }

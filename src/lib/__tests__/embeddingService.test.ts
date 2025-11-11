@@ -57,10 +57,10 @@ describe('EmbeddingService', () => {
     it('should throw error when service fails to initialize', async () => {
       const { pipeline } = await import('@xenova/transformers');
       vi.mocked(pipeline).mockRejectedValue(new Error('Model loading failed'));
-      
+
       const { EmbeddingService } = await import('../embeddingService');
       const newService = new EmbeddingService();
-      
+
       await expect(
         newService.generateEmbedding('test text', 'test-id')
       ).rejects.toThrow('Embedding service initialization failed');
@@ -71,10 +71,10 @@ describe('EmbeddingService', () => {
     it('should handle empty chunk arrays without initialization', async () => {
       const { pipeline } = await import('@xenova/transformers');
       vi.mocked(pipeline).mockRejectedValue(new Error('Model loading failed'));
-      
+
       const { EmbeddingService } = await import('../embeddingService');
       const newService = new EmbeddingService();
-      
+
       await expect(
         newService.generateBatchEmbeddings([])
       ).rejects.toThrow('Embedding service initialization failed');
